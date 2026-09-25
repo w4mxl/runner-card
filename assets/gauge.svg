@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="3 3 42 42" width="48" height="48">
+  <!-- Outer Speedometer Circular Ring -->
+  <circle cx="24" cy="24" r="19" fill="none" stroke="#FFFFFF" stroke-width="3.2"/>
+  <!-- 7 Inward Speedometer Calibration Ticks -->
+  <line x1="6.5" y1="24" x2="10.5" y2="24" stroke="#FFFFFF" stroke-width="2.0" stroke-linecap="round"/>
+  <line x1="8.9" y1="15.2" x2="12.3" y2="17.2" stroke="#FFFFFF" stroke-width="2.0" stroke-linecap="round"/>
+  <line x1="15.2" y1="8.8" x2="17.2" y2="12.3" stroke="#FFFFFF" stroke-width="2.0" stroke-linecap="round"/>
+  <line x1="24" y1="6.5" x2="24" y2="10.5" stroke="#FFFFFF" stroke-width="2.0" stroke-linecap="round"/>
+  <line x1="32.8" y1="8.8" x2="30.8" y2="12.3" stroke="#FFFFFF" stroke-width="2.0" stroke-linecap="round"/>
+  <line x1="39.1" y1="15.2" x2="35.7" y2="17.2" stroke="#FFFFFF" stroke-width="2.0" stroke-linecap="round"/>
+  <line x1="41.5" y1="24" x2="37.5" y2="24" stroke="#FFFFFF" stroke-width="2.0" stroke-linecap="round"/>
+  <!-- Bottom Odometer Level Dash -->
+  <line x1="20.5" y1="36" x2="27.5" y2="36" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round"/>
+  <!-- Gauge Needle -->
+  <line x1="24" y1="24" x2="26" y2="9.5" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round"/>
+  <!-- Center Pin Dot -->
+  <circle cx="24" cy="24" r="2.8" fill="#FFFFFF"/>
+</svg>
