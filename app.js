@@ -75,7 +75,12 @@
   // --- Auto Pace Calculation ---
   function parseTimeToSeconds(timeStr) {
     if (!timeStr) return 0;
-    const parts = timeStr.trim().split(':').map(Number);
+    const str = String(timeStr).trim();
+    if (!str.includes(':')) {
+      const num = parseFloat(str);
+      return isNaN(num) ? 0 : Math.round(num);
+    }
+    const parts = str.split(':').map(Number);
     if (parts.length === 2) {
       return (parts[0] || 0) * 60 + (parts[1] || 0);
     } else if (parts.length === 3) {
@@ -699,8 +704,15 @@
       changed = true;
     }
     if (params.has('time')) {
-      inputTime.value = params.get('time');
-      state.time = params.get('time');
+      let tVal = params.get('time').trim();
+      if (!tVal.includes(':') && !isNaN(parseFloat(tVal))) {
+        const totalSec = Math.round(parseFloat(tVal));
+        const m = Math.floor(totalSec / 60);
+        const s = totalSec % 60;
+        tVal = `${m}:${s < 10 ? '0' + s : s}`;
+      }
+      inputTime.value = tVal;
+      state.time = tVal;
       changed = true;
     }
     if (params.has('pace')) {
