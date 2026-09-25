@@ -710,11 +710,11 @@
     } else if (changed) {
       updatePaceFromInputs();
     }
-    if (params.has('hr')) {
+    if (params.has('hr') && inputHeartRate) {
       inputHeartRate.value = params.get('hr');
       state.heartRate = params.get('hr');
     }
-    if (params.has('cal')) {
+    if (params.has('cal') && inputCalories) {
       inputCalories.value = params.get('cal');
       state.calories = params.get('cal');
     }
