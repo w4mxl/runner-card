@@ -121,6 +121,8 @@ main {
   display: flex;
   flex-direction: column;
   gap: 18px;
+}
+
 /* Mode Segmented Control Bar */
 .mode-segmented-bar {
   display: flex;
