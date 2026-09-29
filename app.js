@@ -86,6 +86,9 @@
   const routeScaleSlider = document.getElementById('routeScaleSlider');
   const routeScaleVal = document.getElementById('routeScaleVal');
   const btnResetRoutePos = document.getElementById('btnResetRoutePos');
+  const gpxUploadTitle = document.getElementById('gpxUploadTitle');
+  const btnToggleSliders = document.getElementById('btnToggleSliders');
+  const routeSlidersContainer = document.getElementById('routeSlidersContainer');
 
   let currentExportBlob = null;
   let currentExportFileName = '';
@@ -1006,6 +1009,27 @@
     }
   }
 
+  function updateGpxCardUI(isLoaded, fileName) {
+    if (!btnSelectGPX) return;
+    if (isLoaded) {
+      btnSelectGPX.classList.add('loaded');
+      if (gpxUploadTitle) gpxUploadTitle.textContent = `✅ 真实轨迹: ${state.routeDist} 公里`;
+      if (gpxInfoBanner) gpxInfoBanner.textContent = `${fileName || '已导入'} (${state.routePoints.length} 点) · 点击可更换`;
+      if (gpxStatusTag) {
+        gpxStatusTag.textContent = '已就绪';
+        gpxStatusTag.classList.add('active');
+      }
+    } else {
+      btnSelectGPX.classList.remove('loaded');
+      if (gpxUploadTitle) gpxUploadTitle.textContent = '选取跑步轨迹文件 (.gpx)';
+      if (gpxInfoBanner) gpxInfoBanner.textContent = '支持 Apple Watch / WorkoutGPX / 佳明 / Keep';
+      if (gpxStatusTag) {
+        gpxStatusTag.textContent = '点此选取';
+        gpxStatusTag.classList.remove('active');
+      }
+    }
+  }
+
   function saveRouteToStorage(fileName) {
     try {
       localStorage.setItem('runner_card_real_route', JSON.stringify({
@@ -1014,6 +1038,7 @@
         loc: state.routeLocation,
         fileName: fileName || 'workout.gpx'
       }));
+      updateGpxCardUI(true, fileName);
     } catch (e) {
       console.warn('Storage error:', e);
     }
@@ -1034,18 +1059,32 @@
             state.routeLocation = data.loc;
             if (inputRouteLocation) inputRouteLocation.value = data.loc;
           }
-          if (gpxStatusTag) {
-            gpxStatusTag.textContent = `${state.routeDist}km · 已缓存`;
-            gpxStatusTag.classList.add('active');
-          }
-          if (gpxInfoBanner) {
-            gpxInfoBanner.textContent = `✅ 已载入最近轨迹: ${data.fileName || '真实轨迹'} (${data.points.length} 点)`;
-          }
+          updateGpxCardUI(true, data.fileName);
         }
       }
     } catch (e) {
       console.warn('Load storage error:', e);
     }
+  }
+
+  function handleGpxFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      const pts = parseGpxOrTcx(evt.target.result);
+      if (pts && pts.length >= 2) {
+        state.routePoints = pts;
+        const d = calculateRouteDistance(pts);
+        state.routeDist = d.toFixed(2);
+        if (inputRouteDist) inputRouteDist.value = state.routeDist;
+        saveRouteToStorage(file.name);
+        showToast(`真实轨迹导入成功 (${state.routeDist} 公里)`);
+        render();
+      } else {
+        showToast('未在文件中识别出有效轨迹坐标');
+      }
+    };
+    reader.readAsText(file);
   }
 
   function updateTabActive(containerSelector, value) {
@@ -1091,48 +1130,61 @@
       btnSelectGPX.addEventListener('click', () => gpxFileInput.click());
       gpxFileInput.addEventListener('change', (e) => {
         if (e.target.files && e.target.files[0]) {
-          const file = e.target.files[0];
-          const reader = new FileReader();
-          reader.onload = function(evt) {
-            const pts = parseGpxOrTcx(evt.target.result);
-            if (pts && pts.length >= 2) {
-              state.routePoints = pts;
-              const d = calculateRouteDistance(pts);
-              state.routeDist = d.toFixed(2);
-              if (inputRouteDist) inputRouteDist.value = state.routeDist;
-              if (gpxStatusTag) {
-                gpxStatusTag.textContent = `${state.routeDist}km · 已载入`;
-                gpxStatusTag.classList.add('active');
-              }
-              if (gpxInfoBanner) {
-                gpxInfoBanner.textContent = `✅ 真实轨迹: ${file.name} (${pts.length} 个点)`;
-              }
-              saveRouteToStorage(file.name);
-              showToast(`真实轨迹导入成功 (${state.routeDist} 公里)`);
-              render();
-            } else {
-              showToast('未在文件中识别出有效轨迹坐标');
-            }
-          };
-          reader.readAsText(file);
+          handleGpxFile(e.target.files[0]);
         }
       });
     }
 
     if (btnClearGPX) {
-      btnClearGPX.addEventListener('click', () => {
+      btnClearGPX.addEventListener('click', (e) => {
+        e.stopPropagation();
         state.routePoints = [];
-        if (gpxStatusTag) {
-          gpxStatusTag.textContent = '待导入 GPX';
-          gpxStatusTag.classList.remove('active');
-        }
-        if (gpxInfoBanner) {
-          gpxInfoBanner.textContent = '💡 支持 WorkoutGPX、佳明、高驰、Keep 等导出的 GPX 文件';
-        }
+        updateGpxCardUI(false);
         if (gpxFileInput) gpxFileInput.value = '';
         localStorage.removeItem('runner_card_real_route');
         showToast('已清除当前轨迹');
         render();
+      });
+    }
+
+    // Position Presets
+    document.querySelectorAll('.btn-pos-preset').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.btn-pos-preset').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const pos = btn.getAttribute('data-pos');
+        if (pos === 'top-left') {
+          state.routeX = 60;
+          state.routeY = 220;
+        } else if (pos === 'bottom-left') {
+          state.routeX = 60;
+          state.routeY = 380;
+        } else if (pos === 'top-right') {
+          state.routeX = 520;
+          state.routeY = 220;
+        } else if (pos === 'bottom-right') {
+          state.routeX = 520;
+          state.routeY = 380;
+        }
+        if (routeXSlider) {
+          routeXSlider.value = state.routeX;
+          if (routeXVal) routeXVal.textContent = state.routeX + 'px';
+        }
+        if (routeYSlider) {
+          routeYSlider.value = state.routeY;
+          if (routeYVal) routeYVal.textContent = state.routeY + 'px';
+        }
+        render();
+      });
+    });
+
+    // Toggle Sliders Accordion
+    if (btnToggleSliders && routeSlidersContainer) {
+      btnToggleSliders.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isHidden = routeSlidersContainer.style.display === 'none';
+        routeSlidersContainer.style.display = isHidden ? 'block' : 'none';
+        btnToggleSliders.textContent = isHidden ? '收起微调 ▴' : '微调滑块 ▾';
       });
     }
 
@@ -1225,7 +1277,13 @@
       e.preventDefault();
       e.stopPropagation();
       if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-        handleFileSelect(e.dataTransfer.files[0]);
+        const file = e.dataTransfer.files[0];
+        const lowerName = file.name.toLowerCase();
+        if (lowerName.endsWith('.gpx') || lowerName.endsWith('.tcx') || lowerName.endsWith('.xml')) {
+          handleGpxFile(file);
+        } else {
+          handleFileSelect(file);
+        }
       }
     });
 

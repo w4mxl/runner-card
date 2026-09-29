@@ -125,39 +125,24 @@
 
     <!-- 2. NRC Route Panel (for NRC 路线版) -->
     <div class="panel-card" id="panelRouteData" style="display: none;">
-      <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
-        <span class="panel-title">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"></path>
-            <circle cx="12" cy="10" r="3"></circle>
+      <!-- Hidden GPX File Input (NO accept attribute so iOS Safari allows picking all files!) -->
+      <input type="file" id="gpxFileInput" style="display: none;">
+
+      <!-- Hero Upload Zone / Status Box -->
+      <div class="gpx-upload-card" id="btnSelectGPX">
+        <div class="gpx-upload-icon" id="gpxUploadIcon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
           </svg>
-          真实跑步路线
-        </span>
-        <span id="gpxStatusTag" class="tag-status">待导入 GPX</span>
+        </div>
+        <div class="gpx-upload-text">
+          <div class="gpx-upload-title" id="gpxUploadTitle">选取跑步轨迹文件 (.gpx)</div>
+          <div class="gpx-upload-desc" id="gpxInfoBanner">支持 Apple Watch / WorkoutGPX / 佳明 / Keep</div>
+        </div>
+        <div class="gpx-upload-badge" id="gpxStatusTag">点此选取</div>
       </div>
 
-      <!-- Hidden GPX File Input -->
-      <input type="file" id="gpxFileInput" accept=".gpx,.tcx,.xml" style="display: none;">
-
-      <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-        <button class="btn-main" id="btnSelectGPX" style="flex: 1; padding: 10px 14px; font-size: 13px; font-weight: 600;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="17 8 12 3 7 8"></polyline>
-            <line x1="12" y1="3" x2="12" y2="15"></line>
-          </svg>
-          导入真实 GPX / TCX 轨迹
-        </button>
-        <button class="btn-secondary" id="btnClearGPX" title="清除轨迹" style="padding: 10px 14px; font-size: 13px;">
-          清除
-        </button>
-      </div>
-
-      <div id="gpxInfoBanner" style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5;">
-        💡 支持 WorkoutGPX、佳明、高驰、Keep 等导出的 GPX 文件（导入后自动反算真实里程）
-      </div>
-
-      <div class="inputs-grid" style="grid-template-columns: 1fr 1fr;">
+      <div class="inputs-grid" style="grid-template-columns: 1fr 1fr; margin-top: 4px;">
         <div class="input-box">
           <span class="input-label">里程 (公里)</span>
           <input type="text" id="inputRouteDist" class="input-field" value="5.12" placeholder="5.12">
@@ -168,26 +153,39 @@
         </div>
       </div>
 
-      <!-- Route Position & Size Fine-Tuning -->
-      <div style="border-top: 1px solid var(--card-border); margin-top: 14px; padding-top: 10px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-          <span style="font-size: 12px; font-weight: 600; color: var(--text-muted);">路线排版微调（防遮挡主体）</span>
-          <button class="btn-secondary" id="btnResetRoutePos" style="padding: 2px 8px; font-size: 11px; border-radius: 6px;">复位位置</button>
+      <!-- Quick Position Presets -->
+      <div class="route-pos-section">
+        <div class="pos-header">
+          <span class="pos-title">路线排版方位（防遮挡照片主体）</span>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <button type="button" class="btn-text-toggle" id="btnClearGPX" style="color: var(--text-muted); font-size: 11px;">清除轨迹</button>
+            <button type="button" class="btn-text-toggle" id="btnToggleSliders">微调滑块 ▾</button>
+          </div>
         </div>
-        <div class="slider-row">
-          <label for="routeXSlider">水平位置</label>
-          <input type="range" id="routeXSlider" min="20" max="650" step="5" value="60">
-          <span class="slider-val" id="routeXVal">60px</span>
+        <div class="pos-preset-grid">
+          <button type="button" class="btn-pos-preset" data-pos="top-left">↖ 左上</button>
+          <button type="button" class="btn-pos-preset active" data-pos="bottom-left">↙ 左下 (原版)</button>
+          <button type="button" class="btn-pos-preset" data-pos="top-right">↗ 右上</button>
+          <button type="button" class="btn-pos-preset" data-pos="bottom-right">↘ 右下</button>
         </div>
-        <div class="slider-row">
-          <label for="routeYSlider">垂直位置</label>
-          <input type="range" id="routeYSlider" min="150" max="750" step="5" value="380">
-          <span class="slider-val" id="routeYVal">380px</span>
-        </div>
-        <div class="slider-row">
-          <label for="routeScaleSlider">路线尺寸</label>
-          <input type="range" id="routeScaleSlider" min="0.6" max="1.8" step="0.05" value="1.0">
-          <span class="slider-val" id="routeScaleVal">100%</span>
+
+        <!-- Collapsible Fine Tuning Sliders -->
+        <div id="routeSlidersContainer" style="display: none; margin-top: 10px; border-top: 1px dashed var(--card-border); padding-top: 10px;">
+          <div class="slider-row">
+            <label for="routeXSlider">水平微调</label>
+            <input type="range" id="routeXSlider" min="20" max="650" step="5" value="60">
+            <span class="slider-val" id="routeXVal">60px</span>
+          </div>
+          <div class="slider-row">
+            <label for="routeYSlider">垂直微调</label>
+            <input type="range" id="routeYSlider" min="150" max="750" step="5" value="380">
+            <span class="slider-val" id="routeYVal">380px</span>
+          </div>
+          <div class="slider-row">
+            <label for="routeScaleSlider">路线尺寸</label>
+            <input type="range" id="routeScaleSlider" min="0.6" max="1.8" step="0.05" value="1.0">
+            <span class="slider-val" id="routeScaleVal">100%</span>
+          </div>
         </div>
       </div>
     </div>
