@@ -23,10 +23,12 @@
     sampleIndex: 2,
     // Real Route State
     routePoints: [],
-    routeDist: '5.12',
+    routeDist: '5.13',
+    routeGpsDist: null,
     routeLocation: '上海市, 中国',
+    routePos: 'bottom-left',
     routeX: 60,
-    routeY: 380,
+    routeY: 640,
     routeScale: 1.0
   };
 
@@ -165,7 +167,12 @@
         canvasWrapper.style.aspectRatio = '9 / 16';
       }
     }
-    render();
+
+    if (state.routePos && state.routePos !== 'custom' && typeof applyRoutePreset === 'function') {
+      applyRoutePreset(state.routePos);
+    } else {
+      render();
+    }
   }
 
   // --- Canvas Rendering Engine ---
@@ -247,18 +254,23 @@
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
 
+    // Avoid collision: if route is in top-right area, flip logo to top-left!
+    const isRouteTopRight = (state.template === 'route') && (state.routeX > w / 2) && (state.routeY < h / 2);
+
     if (state.logo === 'nike') {
       if (assets.swoosh.complete && assets.swoosh.naturalWidth > 0) {
         const logoW = 141;
         const logoH = 50;
-        const logoX = w - logoW - 65;
+        const logoX = isRouteTopRight ? 65 : (w - logoW - 65);
         const logoY = 66;
         ctx.drawImage(assets.swoosh, logoX, logoY, logoW, logoH);
       }
     } else if (state.logo === 'apple_rings') {
-      drawAppleActivityRings(w - 110, 95, 34);
+      const ringX = isRouteTopRight ? 110 : (w - 110);
+      drawAppleActivityRings(ringX, 95, 34);
     } else if (state.logo === 'apple_runner') {
-      drawAppleRunnerIcon(w - 100, 90, 36);
+      const runnerX = isRouteTopRight ? 100 : (w - 100);
+      drawAppleRunnerIcon(runnerX, 90, 36);
     }
     ctx.restore();
   }
@@ -758,15 +770,15 @@
       ctx.restore();
     }
 
-    // --- 3. Location Text ---
-    const locY = routeTopY + targetH + 34;
+    // --- 3. Location Text (NRC 1:1 官方复刻) ---
+    const locY = routeTopY + targetH + 44;
     ctx.save();
     ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
     ctx.shadowBlur = 4;
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 1;
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = '500 24px "PingFang SC", "SF Pro Text", -apple-system, sans-serif';
+    ctx.font = '600 38px "PingFang SC", "Hiragino Sans GB", "SF Pro Text", "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
     ctx.fillText(state.routeLocation || '上海市, 中国', gx, locY);
@@ -1009,12 +1021,20 @@
     }
   }
 
-  function updateGpxCardUI(isLoaded, fileName) {
+  function updateGpxCardUI(isLoaded, fileName, gpsDist) {
     if (!btnSelectGPX) return;
     if (isLoaded) {
       btnSelectGPX.classList.add('loaded');
-      if (gpxUploadTitle) gpxUploadTitle.textContent = `✅ 真实轨迹: ${state.routeDist} 公里`;
-      if (gpxInfoBanner) gpxInfoBanner.textContent = `${fileName || '已导入'} (${state.routePoints.length} 点) · 点击可更换`;
+      const distToShow = state.routeDist || state.dist || '5.13';
+      const actualGps = gpsDist || state.routeGpsDist;
+      if (gpxUploadTitle) gpxUploadTitle.textContent = `✅ 真实轨迹: ${distToShow} 公里`;
+      const pointsCount = state.routePoints ? state.routePoints.length : 0;
+      let infoText = `${fileName || '已导入'} (${pointsCount} 点)`;
+      if (actualGps && String(actualGps) !== String(distToShow)) {
+        infoText += ` · 轨迹实测 ${actualGps} km`;
+      }
+      infoText += ' · 点击更换';
+      if (gpxInfoBanner) gpxInfoBanner.textContent = infoText;
       if (gpxStatusTag) {
         gpxStatusTag.textContent = '已就绪';
         gpxStatusTag.classList.add('active');
@@ -1030,15 +1050,17 @@
     }
   }
 
-  function saveRouteToStorage(fileName) {
+  function saveRouteToStorage(fileName, gpsDist) {
     try {
       localStorage.setItem('runner_card_real_route', JSON.stringify({
         points: state.routePoints,
         dist: state.routeDist,
+        gpsDist: gpsDist || state.routeGpsDist,
         loc: state.routeLocation,
+        pos: state.routePos,
         fileName: fileName || 'workout.gpx'
       }));
-      updateGpxCardUI(true, fileName);
+      updateGpxCardUI(true, fileName, gpsDist);
     } catch (e) {
       console.warn('Storage error:', e);
     }
@@ -1051,15 +1073,21 @@
         const data = JSON.parse(saved);
         if (data && data.points && data.points.length >= 2) {
           state.routePoints = data.points;
-          if (data.dist) {
+          state.routeGpsDist = data.gpsDist || null;
+          const urlParams = new URLSearchParams(window.location.search);
+          // Prioritize URL official workout distance if present
+          if (!urlParams.has('dist') && data.dist) {
             state.routeDist = data.dist;
             if (inputRouteDist) inputRouteDist.value = data.dist;
           }
-          if (data.loc) {
+          if (!urlParams.has('loc') && data.loc) {
             state.routeLocation = data.loc;
             if (inputRouteLocation) inputRouteLocation.value = data.loc;
           }
-          updateGpxCardUI(true, data.fileName);
+          if (data.pos && data.pos !== 'custom') {
+            state.routePos = data.pos;
+          }
+          updateGpxCardUI(true, data.fileName, data.gpsDist);
         }
       }
     } catch (e) {
@@ -1074,17 +1102,85 @@
       const pts = parseGpxOrTcx(evt.target.result);
       if (pts && pts.length >= 2) {
         state.routePoints = pts;
-        const d = calculateRouteDistance(pts);
-        state.routeDist = d.toFixed(2);
-        if (inputRouteDist) inputRouteDist.value = state.routeDist;
-        saveRouteToStorage(file.name);
-        showToast(`真实轨迹导入成功 (${state.routeDist} 公里)`);
+        const gpsDist = calculateRouteDistance(pts).toFixed(2);
+        state.routeGpsDist = gpsDist;
+
+        // Issue 2: Retain official workout record distance if available
+        const currentRouteInput = inputRouteDist ? inputRouteDist.value.trim() : '';
+        const currentBottomInput = inputDist ? inputDist.value.trim() : '';
+        const isDefaultOrEmpty = (v) => !v || v === '0' || v === '5.03' || v === '5.12';
+
+        let officialDist = '';
+        if (currentRouteInput && !isDefaultOrEmpty(currentRouteInput)) {
+          officialDist = currentRouteInput;
+        } else if (state.dist && !isDefaultOrEmpty(state.dist)) {
+          officialDist = state.dist;
+        } else if (currentBottomInput && !isDefaultOrEmpty(currentBottomInput)) {
+          officialDist = currentBottomInput;
+        }
+
+        if (officialDist) {
+          state.routeDist = officialDist;
+          if (inputRouteDist) inputRouteDist.value = officialDist;
+          showToast(`真实轨迹导入成功（采用运动记录 ${officialDist} 公里）`);
+        } else {
+          state.routeDist = gpsDist;
+          if (inputRouteDist) inputRouteDist.value = gpsDist;
+          showToast(`真实轨迹导入成功 (${gpsDist} 公里)`);
+        }
+
+        saveRouteToStorage(file.name, gpsDist);
         render();
       } else {
         showToast('未在文件中识别出有效轨迹坐标');
       }
     };
     reader.readAsText(file);
+  }
+
+  // --- Dynamic 4 Quadrant Positioning System ---
+  function applyRoutePreset(pos) {
+    state.routePos = pos;
+    const w = canvas.width;
+    const h = canvas.height;
+
+    // Issue 1 Fix: Accurate pixel positions matching NRC 1:1
+    // Target content width ~240px; right margin 60px -> gx = w - 300
+    // Target content height ~305px; bottom margin 80px -> gy = h - 384
+    if (pos === 'top-left') {
+      state.routeX = 60;
+      state.routeY = 160;
+    } else if (pos === 'bottom-left') {
+      state.routeX = 60;
+      state.routeY = Math.round(h - 384);
+    } else if (pos === 'top-right') {
+      state.routeX = Math.round(w - 300);
+      state.routeY = 160;
+    } else if (pos === 'bottom-right') {
+      state.routeX = Math.round(w - 300);
+      state.routeY = Math.round(h - 384);
+    }
+
+    if (routeXSlider) {
+      routeXSlider.max = Math.max(800, w - 80);
+      routeXSlider.value = state.routeX;
+      if (routeXVal) routeXVal.textContent = state.routeX + 'px';
+    }
+    if (routeYSlider) {
+      routeYSlider.max = Math.max(800, h - 160);
+      routeYSlider.value = state.routeY;
+      if (routeYVal) routeYVal.textContent = state.routeY + 'px';
+    }
+
+    document.querySelectorAll('.btn-pos-preset').forEach(b => {
+      if (b.getAttribute('data-pos') === pos) {
+        b.classList.add('active');
+      } else {
+        b.classList.remove('active');
+      }
+    });
+
+    render();
   }
 
   function updateTabActive(containerSelector, value) {
@@ -1139,6 +1235,7 @@
       btnClearGPX.addEventListener('click', (e) => {
         e.stopPropagation();
         state.routePoints = [];
+        state.routeGpsDist = null;
         updateGpxCardUI(false);
         if (gpxFileInput) gpxFileInput.value = '';
         localStorage.removeItem('runner_card_real_route');
@@ -1150,31 +1247,8 @@
     // Position Presets
     document.querySelectorAll('.btn-pos-preset').forEach(btn => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('.btn-pos-preset').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
         const pos = btn.getAttribute('data-pos');
-        if (pos === 'top-left') {
-          state.routeX = 60;
-          state.routeY = 220;
-        } else if (pos === 'bottom-left') {
-          state.routeX = 60;
-          state.routeY = 380;
-        } else if (pos === 'top-right') {
-          state.routeX = 520;
-          state.routeY = 220;
-        } else if (pos === 'bottom-right') {
-          state.routeX = 520;
-          state.routeY = 380;
-        }
-        if (routeXSlider) {
-          routeXSlider.value = state.routeX;
-          if (routeXVal) routeXVal.textContent = state.routeX + 'px';
-        }
-        if (routeYSlider) {
-          routeYSlider.value = state.routeY;
-          if (routeYVal) routeYVal.textContent = state.routeY + 'px';
-        }
-        render();
+        applyRoutePreset(pos);
       });
     });
 
@@ -1191,6 +1265,11 @@
     if (inputRouteDist) {
       inputRouteDist.addEventListener('input', () => {
         state.routeDist = inputRouteDist.value.trim();
+        state.dist = state.routeDist;
+        if (inputDist) inputDist.value = state.routeDist;
+        if (state.routePoints && state.routePoints.length >= 2) {
+          updateGpxCardUI(true);
+        }
         render();
       });
     }
@@ -1205,6 +1284,8 @@
     if (routeXSlider) {
       routeXSlider.addEventListener('input', (e) => {
         state.routeX = parseFloat(e.target.value);
+        state.routePos = 'custom';
+        document.querySelectorAll('.btn-pos-preset').forEach(b => b.classList.remove('active'));
         if (routeXVal) routeXVal.textContent = state.routeX + 'px';
         render();
       });
@@ -1213,6 +1294,8 @@
     if (routeYSlider) {
       routeYSlider.addEventListener('input', (e) => {
         state.routeY = parseFloat(e.target.value);
+        state.routePos = 'custom';
+        document.querySelectorAll('.btn-pos-preset').forEach(b => b.classList.remove('active'));
         if (routeYVal) routeYVal.textContent = state.routeY + 'px';
         render();
       });
@@ -1228,21 +1311,23 @@
 
     if (btnResetRoutePos) {
       btnResetRoutePos.addEventListener('click', () => {
-        state.routeX = 60;
-        state.routeY = 380;
         state.routeScale = 1.0;
-        if (routeXSlider) routeXSlider.value = 60;
-        if (routeXVal) routeXVal.textContent = '60px';
-        if (routeYSlider) routeYSlider.value = 380;
-        if (routeYVal) routeYVal.textContent = '380px';
         if (routeScaleSlider) routeScaleSlider.value = 1.0;
         if (routeScaleVal) routeScaleVal.textContent = '100%';
-        render();
-        showToast('路线位置已复位');
+        applyRoutePreset('bottom-left');
+        showToast('路线位置已复位 (左下原版)');
       });
     }
 
-    inputDist.addEventListener('input', updatePaceFromInputs);
+    inputDist.addEventListener('input', () => {
+      state.dist = inputDist.value.trim();
+      state.routeDist = state.dist;
+      if (inputRouteDist) inputRouteDist.value = state.dist;
+      if (state.routePoints && state.routePoints.length >= 2) {
+        updateGpxCardUI(true);
+      }
+      updatePaceFromInputs();
+    });
     inputTime.addEventListener('input', updatePaceFromInputs);
     inputPace.addEventListener('input', () => {
       state.pace = inputPace.value.trim();

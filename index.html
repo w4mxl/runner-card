@@ -145,7 +145,7 @@
       <div class="inputs-grid" style="grid-template-columns: 1fr 1fr; margin-top: 4px;">
         <div class="input-box">
           <span class="input-label">里程 (公里)</span>
-          <input type="text" id="inputRouteDist" class="input-field" value="5.12" placeholder="5.12">
+          <input type="text" id="inputRouteDist" class="input-field" value="5.13" placeholder="5.13">
         </div>
         <div class="input-box">
           <span class="input-label">地点文字</span>
@@ -173,18 +173,21 @@
         <div id="routeSlidersContainer" style="display: none; margin-top: 10px; border-top: 1px dashed var(--card-border); padding-top: 10px;">
           <div class="slider-row">
             <label for="routeXSlider">水平微调</label>
-            <input type="range" id="routeXSlider" min="20" max="650" step="5" value="60">
+            <input type="range" id="routeXSlider" min="20" max="800" step="5" value="60">
             <span class="slider-val" id="routeXVal">60px</span>
           </div>
           <div class="slider-row">
             <label for="routeYSlider">垂直微调</label>
-            <input type="range" id="routeYSlider" min="150" max="750" step="5" value="380">
-            <span class="slider-val" id="routeYVal">380px</span>
+            <input type="range" id="routeYSlider" min="100" max="1600" step="5" value="640">
+            <span class="slider-val" id="routeYVal">640px</span>
           </div>
           <div class="slider-row">
             <label for="routeScaleSlider">路线尺寸</label>
             <input type="range" id="routeScaleSlider" min="0.6" max="1.8" step="0.05" value="1.0">
             <span class="slider-val" id="routeScaleVal">100%</span>
+          </div>
+          <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
+            <button type="button" class="btn-secondary" id="btnResetRoutePos" style="padding: 4px 10px; font-size: 11px; border-radius: 6px;">复位位置 (左下原版)</button>
           </div>
         </div>
       </div>
