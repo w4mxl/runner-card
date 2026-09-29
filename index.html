@@ -46,6 +46,24 @@
   <!-- Main Workspace -->
   <main>
     
+    <!-- Mode / Template Segmented Bar -->
+    <div class="mode-segmented-bar">
+      <button class="seg-btn active" id="btnModeBottom" data-mode="nrc">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+        底部数据版
+      </button>
+      <button class="seg-btn" id="btnModeRoute" data-mode="route">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"></path>
+          <circle cx="12" cy="10" r="3"></circle>
+        </svg>
+        NRC 路线版
+      </button>
+    </div>
+
     <!-- Canvas Preview Card -->
     <div class="preview-card" id="previewContainer">
       <div class="canvas-wrapper" id="canvasWrapper">
@@ -68,14 +86,14 @@
 
     <!-- Clean Gesture Hint below Canvas -->
     <div style="text-align: center; font-size: 12px; color: var(--text-muted); margin-top: -8px; margin-bottom: 2px;">
-      👆 单指拖动平移 · 双指缩放构图（纯净所见即所得）
+      👆 单指拖动平移 · 双指缩放构图（所见即所得）
     </div>
 
-    <!-- Hidden File Input -->
+    <!-- Hidden File Input for Background Photo -->
     <input type="file" id="fileInput" accept="image/*" style="display: none;">
 
-    <!-- Workout Data Panel -->
-    <div class="panel-card">
+    <!-- 1. Bottom Stats Panel (for 底部数据版) -->
+    <div class="panel-card" id="panelBottomData">
       <div class="panel-header">
         <span class="panel-title">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -102,7 +120,75 @@
           <input type="text" id="inputPace" class="input-field" value="4'48&quot;" placeholder="4'48&quot;">
         </div>
       </div>
+    </div>
 
+    <!-- 2. NRC Route Panel (for NRC 路线版) -->
+    <div class="panel-card" id="panelRouteData" style="display: none;">
+      <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <span class="panel-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"></path>
+            <circle cx="12" cy="10" r="3"></circle>
+          </svg>
+          真实跑步路线
+        </span>
+        <span id="gpxStatusTag" class="tag-status">待导入 GPX</span>
+      </div>
+
+      <!-- Hidden GPX File Input -->
+      <input type="file" id="gpxFileInput" accept=".gpx,.tcx,.xml" style="display: none;">
+
+      <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+        <button class="btn-main" id="btnSelectGPX" style="flex: 1; padding: 10px 14px; font-size: 13px; font-weight: 600;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+          导入真实 GPX / TCX 轨迹
+        </button>
+        <button class="btn-secondary" id="btnClearGPX" title="清除轨迹" style="padding: 10px 14px; font-size: 13px;">
+          清除
+        </button>
+      </div>
+
+      <div id="gpxInfoBanner" style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5;">
+        💡 支持 WorkoutGPX、佳明、高驰、Keep 等导出的 GPX 文件（导入后自动反算真实里程）
+      </div>
+
+      <div class="inputs-grid" style="grid-template-columns: 1fr 1fr;">
+        <div class="input-box">
+          <span class="input-label">里程 (公里)</span>
+          <input type="text" id="inputRouteDist" class="input-field" value="5.12" placeholder="5.12">
+        </div>
+        <div class="input-box">
+          <span class="input-label">地点文字</span>
+          <input type="text" id="inputRouteLocation" class="input-field" value="上海市, 中国" placeholder="上海市, 中国">
+        </div>
+      </div>
+
+      <!-- Route Position & Size Fine-Tuning -->
+      <div style="border-top: 1px solid var(--card-border); margin-top: 14px; padding-top: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="font-size: 12px; font-weight: 600; color: var(--text-muted);">路线排版微调（防遮挡主体）</span>
+          <button class="btn-secondary" id="btnResetRoutePos" style="padding: 2px 8px; font-size: 11px; border-radius: 6px;">复位位置</button>
+        </div>
+        <div class="slider-row">
+          <label for="routeXSlider">水平位置</label>
+          <input type="range" id="routeXSlider" min="20" max="650" step="5" value="60">
+          <span class="slider-val" id="routeXVal">60px</span>
+        </div>
+        <div class="slider-row">
+          <label for="routeYSlider">垂直位置</label>
+          <input type="range" id="routeYSlider" min="150" max="750" step="5" value="380">
+          <span class="slider-val" id="routeYVal">380px</span>
+        </div>
+        <div class="slider-row">
+          <label for="routeScaleSlider">路线尺寸</label>
+          <input type="range" id="routeScaleSlider" min="0.6" max="1.8" step="0.05" value="1.0">
+          <span class="slider-val" id="routeScaleVal">100%</span>
+        </div>
+      </div>
     </div>
 
     <!-- Fine Tuning Panel -->

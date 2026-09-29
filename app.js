@@ -15,12 +15,19 @@
     pace: "4'40\"",
     heartRate: '152',
     calories: '368',
-    template: 'nrc',
+    template: 'nrc', // 'nrc' (bottom stats) or 'route' (NRC route mode)
     logo: 'nike',
     ratio: '1:1',
     vignette: 0,
     exportFormat: 'jpeg',
-    sampleIndex: 2
+    sampleIndex: 2,
+    // Real Route State
+    routePoints: [],
+    routeDist: '5.12',
+    routeLocation: '上海市, 中国',
+    routeX: 60,
+    routeY: 380,
+    routeScale: 1.0
   };
 
   // 100% Pure Transparent Background Vector SVGs
@@ -59,6 +66,26 @@
   const btnNativeShare = document.getElementById('btnNativeShare');
   const btnDirectDownload = document.getElementById('btnDirectDownload');
   const btnCloseSaveModal = document.getElementById('btnCloseSaveModal');
+
+  // Mode & Route DOM Elements
+  const btnModeBottom = document.getElementById('btnModeBottom');
+  const btnModeRoute = document.getElementById('btnModeRoute');
+  const panelBottomData = document.getElementById('panelBottomData');
+  const panelRouteData = document.getElementById('panelRouteData');
+  const gpxFileInput = document.getElementById('gpxFileInput');
+  const btnSelectGPX = document.getElementById('btnSelectGPX');
+  const btnClearGPX = document.getElementById('btnClearGPX');
+  const gpxStatusTag = document.getElementById('gpxStatusTag');
+  const gpxInfoBanner = document.getElementById('gpxInfoBanner');
+  const inputRouteDist = document.getElementById('inputRouteDist');
+  const inputRouteLocation = document.getElementById('inputRouteLocation');
+  const routeXSlider = document.getElementById('routeXSlider');
+  const routeXVal = document.getElementById('routeXVal');
+  const routeYSlider = document.getElementById('routeYSlider');
+  const routeYVal = document.getElementById('routeYVal');
+  const routeScaleSlider = document.getElementById('routeScaleSlider');
+  const routeScaleVal = document.getElementById('routeScaleVal');
+  const btnResetRoutePos = document.getElementById('btnResetRoutePos');
 
   let currentExportBlob = null;
   let currentExportFileName = '';
@@ -191,7 +218,9 @@
     renderLogo(w, h);
 
     // 4. Render Layout by Template
-    if (state.template === 'nrc') {
+    if (state.template === 'route') {
+      renderTemplateRoute(w, h);
+    } else if (state.template === 'nrc') {
       renderTemplateNRC(w, h);
     } else if (state.template === 'apple') {
       renderTemplateApple(w, h);
@@ -525,6 +554,222 @@
     ctx.restore();
   }
 
+  // ==========================================
+  // TEMPLATE: NRC Real GPS Route Mode (1:1 官方复刻)
+  // ==========================================
+  function parseGpxOrTcx(text) {
+    try {
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(text, 'text/xml');
+      let pts = [];
+
+      // 1. Try standard GPX <trkpt>
+      const trkpts = xml.querySelectorAll('trkpt');
+      if (trkpts.length > 0) {
+        trkpts.forEach(p => {
+          const lat = parseFloat(p.getAttribute('lat'));
+          const lon = parseFloat(p.getAttribute('lon'));
+          if (!isNaN(lat) && !isNaN(lon)) pts.push({ lat, lon });
+        });
+      }
+
+      // 2. Try Garmin / Coros / TCX <Trackpoint>
+      if (pts.length === 0) {
+        const trackpoints = xml.querySelectorAll('Trackpoint');
+        trackpoints.forEach(p => {
+          const latEl = p.querySelector('LatitudeDegrees');
+          const lonEl = p.querySelector('LongitudeDegrees');
+          if (latEl && lonEl) {
+            const lat = parseFloat(latEl.textContent);
+            const lon = parseFloat(lonEl.textContent);
+            if (!isNaN(lat) && !isNaN(lon)) pts.push({ lat, lon });
+          }
+        });
+      }
+
+      // 3. Fallback: <wpt> or <rtept>
+      if (pts.length === 0) {
+        const wpts = xml.querySelectorAll('wpt, rtept');
+        wpts.forEach(p => {
+          const lat = parseFloat(p.getAttribute('lat'));
+          const lon = parseFloat(p.getAttribute('lon'));
+          if (!isNaN(lat) && !isNaN(lon)) pts.push({ lat, lon });
+        });
+      }
+
+      return pts;
+    } catch (err) {
+      console.error('GPX parse error:', err);
+      return [];
+    }
+  }
+
+  function calculateRouteDistance(points) {
+    if (!points || points.length < 2) return 0;
+    let totalKm = 0;
+    const R = 6371; // Earth radius km
+    for (let i = 1; i < points.length; i++) {
+      const p1 = points[i - 1];
+      const p2 = points[i];
+      const dLat = (p2.lat - p1.lat) * Math.PI / 180;
+      const dLon = (p2.lon - p1.lon) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(p1.lat * Math.PI / 180) * Math.cos(p2.lat * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      totalKm += R * c;
+    }
+    return totalKm;
+  }
+
+  function renderTemplateRoute(w, h) {
+    const numFont = 'bold 64px "NRCFont", "Rubik", -apple-system, sans-serif';
+    const gx = state.routeX;
+    const gy = state.routeY;
+    const scale = state.routeScale;
+
+    // --- 1. Distance + "公里" (100% 平齐等高 + 纯净自然字重) ---
+    ctx.save();
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 1;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textBaseline = 'alphabetic';
+    ctx.textAlign = 'left';
+
+    ctx.font = numFont;
+    const distNumText = state.routeDist || state.dist || '5.12';
+    const numMetrics = ctx.measureText(distNumText);
+    const numAscent = numMetrics.actualBoundingBoxAscent || 52;
+    const numDescent = numMetrics.actualBoundingBoxDescent || 2;
+    const numHeight = numAscent + numDescent;
+    const distNumWidth = numMetrics.width;
+
+    // Calculate matching Chinese font size
+    let cnFontSize = Math.round(numHeight * 0.96);
+    ctx.font = `700 ${cnFontSize}px "PingFang SC", "Hiragino Sans GB", "SF Pro Text", sans-serif`;
+    let cnMetrics = ctx.measureText(' 公里');
+    let cnH = cnMetrics.actualBoundingBoxAscent + cnMetrics.actualBoundingBoxDescent;
+    if (cnH > 0 && Math.abs(cnH - numHeight) > 1) {
+      cnFontSize = Math.round(cnFontSize * (numHeight / cnH));
+      ctx.font = `700 ${cnFontSize}px "PingFang SC", "Hiragino Sans GB", "SF Pro Text", sans-serif`;
+      cnMetrics = ctx.measureText(' 公里');
+    }
+
+    // Align Chinese baseline
+    const baselineY_cn = (gy - numAscent) + (cnMetrics.actualBoundingBoxAscent || (numAscent * 0.9));
+
+    // Draw Distance Number
+    ctx.font = numFont;
+    ctx.fillText(distNumText, gx, gy);
+
+    // Draw "公里"
+    ctx.font = `700 ${cnFontSize}px "PingFang SC", "Hiragino Sans GB", "SF Pro Text", sans-serif`;
+    ctx.fillText(' 公里', gx + distNumWidth, baselineY_cn);
+    ctx.restore();
+
+    // --- 2. GPS Real Route Track ---
+    const targetW = 180 * scale;
+    const targetH = 230 * scale;
+    const routeTopY = gy + 22;
+
+    if (state.routePoints && state.routePoints.length >= 2) {
+      const pts = state.routePoints;
+      let minLat = Infinity, maxLat = -Infinity;
+      let minLon = Infinity, maxLon = -Infinity;
+      for (const p of pts) {
+        if (p.lat < minLat) minLat = p.lat;
+        if (p.lat > maxLat) maxLat = p.lat;
+        if (p.lon < minLon) minLon = p.lon;
+        if (p.lon > maxLon) maxLon = p.lon;
+      }
+
+      const midLat = (minLat + maxLat) / 2;
+      const cosLat = Math.cos(midLat * Math.PI / 180);
+      const projected = pts.map(p => ({
+        x: p.lon * cosLat,
+        y: p.lat
+      }));
+
+      let pMinX = Infinity, pMaxX = -Infinity;
+      let pMinY = Infinity, pMaxY = -Infinity;
+      for (const p of projected) {
+        if (p.x < pMinX) pMinX = p.x;
+        if (p.x > pMaxX) pMaxX = p.x;
+        if (p.y < pMinY) pMinY = p.y;
+        if (p.y > pMaxY) pMaxY = p.y;
+      }
+
+      const spanX = pMaxX - pMinX || 0.0001;
+      const spanY = pMaxY - pMinY || 0.0001;
+      const pad = 8;
+      const availW = targetW - pad * 2;
+      const availH = targetH - pad * 2;
+      const fitScale = Math.min(availW / spanX, availH / spanY);
+
+      const ox = gx + pad + (availW - spanX * fitScale) / 2;
+      const oy = routeTopY + pad + (availH - spanY * fitScale) / 2;
+
+      const screenPts = projected.map(p => ({
+        x: ox + (p.x - pMinX) * fitScale,
+        y: routeTopY + targetH - (oy - routeTopY + (p.y - pMinY) * fitScale)
+      }));
+
+      ctx.save();
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+      ctx.shadowBlur = 4;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 1;
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = Math.max(3, 4.5 * scale);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      ctx.beginPath();
+      ctx.moveTo(screenPts[0].x, screenPts[0].y);
+      for (let i = 1; i < screenPts.length; i++) {
+        ctx.lineTo(screenPts[i].x, screenPts[i].y);
+      }
+      ctx.stroke();
+
+      // Start Point Solid White Dot
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(screenPts[0].x, screenPts[0].y, Math.max(4, 5 * scale), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    } else {
+      // Placeholder dashed box
+      ctx.save();
+      ctx.setLineDash([6, 6]);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(gx, routeTopY, targetW, targetH);
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+      ctx.font = '600 15px "PingFang SC", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('＋ 请导入 GPX 真实轨迹', gx + targetW / 2, routeTopY + targetH / 2);
+      ctx.restore();
+    }
+
+    // --- 3. Location Text ---
+    const locY = routeTopY + targetH + 34;
+    ctx.save();
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 1;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '500 24px "PingFang SC", "SF Pro Text", -apple-system, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(state.routeLocation || '上海市, 中国', gx, locY);
+    ctx.restore();
+  }
+
   // --- Image Loading & Sample Handling ---
   function loadImage(src) {
     const img = new Image();
@@ -730,17 +975,76 @@
       inputCalories.value = params.get('cal');
       state.calories = params.get('cal');
     }
-    if (params.has('tpl')) {
-      state.template = params.get('tpl');
+    if (params.has('tpl') || params.has('template') || params.has('mode')) {
+      const t = params.get('tpl') || params.get('template') || params.get('mode');
+      if (t === 'route') {
+        state.template = 'route';
+        if (btnModeRoute) btnModeRoute.classList.add('active');
+        if (btnModeBottom) btnModeBottom.classList.remove('active');
+        if (panelBottomData) panelBottomData.style.display = 'none';
+        if (panelRouteData) panelRouteData.style.display = 'block';
+      } else {
+        state.template = t;
+      }
       updateTabActive('#templateTabs', state.template);
     }
     if (params.has('logo')) {
       state.logo = params.get('logo');
       updateTabActive('#logoTabs', state.logo);
     }
+    if (params.has('loc')) {
+      state.routeLocation = params.get('loc');
+      if (inputRouteLocation) inputRouteLocation.value = state.routeLocation;
+    }
+    if (params.has('dist') && inputRouteDist) {
+      state.routeDist = params.get('dist');
+      inputRouteDist.value = state.routeDist;
+    }
 
     if (changed) {
       showToast('⚡️ 已从 Apple 健身导入数据');
+    }
+  }
+
+  function saveRouteToStorage(fileName) {
+    try {
+      localStorage.setItem('runner_card_real_route', JSON.stringify({
+        points: state.routePoints,
+        dist: state.routeDist,
+        loc: state.routeLocation,
+        fileName: fileName || 'workout.gpx'
+      }));
+    } catch (e) {
+      console.warn('Storage error:', e);
+    }
+  }
+
+  function loadRouteFromStorage() {
+    try {
+      const saved = localStorage.getItem('runner_card_real_route');
+      if (saved) {
+        const data = JSON.parse(saved);
+        if (data && data.points && data.points.length >= 2) {
+          state.routePoints = data.points;
+          if (data.dist) {
+            state.routeDist = data.dist;
+            if (inputRouteDist) inputRouteDist.value = data.dist;
+          }
+          if (data.loc) {
+            state.routeLocation = data.loc;
+            if (inputRouteLocation) inputRouteLocation.value = data.loc;
+          }
+          if (gpxStatusTag) {
+            gpxStatusTag.textContent = `${state.routeDist}km · 已缓存`;
+            gpxStatusTag.classList.add('active');
+          }
+          if (gpxInfoBanner) {
+            gpxInfoBanner.textContent = `✅ 已载入最近轨迹: ${data.fileName || '真实轨迹'} (${data.points.length} 点)`;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Load storage error:', e);
     }
   }
 
@@ -760,6 +1064,132 @@
 
   // --- Event Listeners Binding ---
   function initListeners() {
+    // Mode Switcher
+    if (btnModeBottom) {
+      btnModeBottom.addEventListener('click', () => {
+        state.template = 'nrc';
+        btnModeBottom.classList.add('active');
+        if (btnModeRoute) btnModeRoute.classList.remove('active');
+        if (panelBottomData) panelBottomData.style.display = 'block';
+        if (panelRouteData) panelRouteData.style.display = 'none';
+        render();
+      });
+    }
+    if (btnModeRoute) {
+      btnModeRoute.addEventListener('click', () => {
+        state.template = 'route';
+        btnModeRoute.classList.add('active');
+        if (btnModeBottom) btnModeBottom.classList.remove('active');
+        if (panelBottomData) panelBottomData.style.display = 'none';
+        if (panelRouteData) panelRouteData.style.display = 'block';
+        render();
+      });
+    }
+
+    // GPX Selection & Parsing
+    if (btnSelectGPX && gpxFileInput) {
+      btnSelectGPX.addEventListener('click', () => gpxFileInput.click());
+      gpxFileInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files[0]) {
+          const file = e.target.files[0];
+          const reader = new FileReader();
+          reader.onload = function(evt) {
+            const pts = parseGpxOrTcx(evt.target.result);
+            if (pts && pts.length >= 2) {
+              state.routePoints = pts;
+              const d = calculateRouteDistance(pts);
+              state.routeDist = d.toFixed(2);
+              if (inputRouteDist) inputRouteDist.value = state.routeDist;
+              if (gpxStatusTag) {
+                gpxStatusTag.textContent = `${state.routeDist}km · 已载入`;
+                gpxStatusTag.classList.add('active');
+              }
+              if (gpxInfoBanner) {
+                gpxInfoBanner.textContent = `✅ 真实轨迹: ${file.name} (${pts.length} 个点)`;
+              }
+              saveRouteToStorage(file.name);
+              showToast(`真实轨迹导入成功 (${state.routeDist} 公里)`);
+              render();
+            } else {
+              showToast('未在文件中识别出有效轨迹坐标');
+            }
+          };
+          reader.readAsText(file);
+        }
+      });
+    }
+
+    if (btnClearGPX) {
+      btnClearGPX.addEventListener('click', () => {
+        state.routePoints = [];
+        if (gpxStatusTag) {
+          gpxStatusTag.textContent = '待导入 GPX';
+          gpxStatusTag.classList.remove('active');
+        }
+        if (gpxInfoBanner) {
+          gpxInfoBanner.textContent = '💡 支持 WorkoutGPX、佳明、高驰、Keep 等导出的 GPX 文件';
+        }
+        if (gpxFileInput) gpxFileInput.value = '';
+        localStorage.removeItem('runner_card_real_route');
+        showToast('已清除当前轨迹');
+        render();
+      });
+    }
+
+    if (inputRouteDist) {
+      inputRouteDist.addEventListener('input', () => {
+        state.routeDist = inputRouteDist.value.trim();
+        render();
+      });
+    }
+
+    if (inputRouteLocation) {
+      inputRouteLocation.addEventListener('input', () => {
+        state.routeLocation = inputRouteLocation.value.trim();
+        render();
+      });
+    }
+
+    if (routeXSlider) {
+      routeXSlider.addEventListener('input', (e) => {
+        state.routeX = parseFloat(e.target.value);
+        if (routeXVal) routeXVal.textContent = state.routeX + 'px';
+        render();
+      });
+    }
+
+    if (routeYSlider) {
+      routeYSlider.addEventListener('input', (e) => {
+        state.routeY = parseFloat(e.target.value);
+        if (routeYVal) routeYVal.textContent = state.routeY + 'px';
+        render();
+      });
+    }
+
+    if (routeScaleSlider) {
+      routeScaleSlider.addEventListener('input', (e) => {
+        state.routeScale = parseFloat(e.target.value);
+        if (routeScaleVal) routeScaleVal.textContent = Math.round(state.routeScale * 100) + '%';
+        render();
+      });
+    }
+
+    if (btnResetRoutePos) {
+      btnResetRoutePos.addEventListener('click', () => {
+        state.routeX = 60;
+        state.routeY = 380;
+        state.routeScale = 1.0;
+        if (routeXSlider) routeXSlider.value = 60;
+        if (routeXVal) routeXVal.textContent = '60px';
+        if (routeYSlider) routeYSlider.value = 380;
+        if (routeYVal) routeYVal.textContent = '380px';
+        if (routeScaleSlider) routeScaleSlider.value = 1.0;
+        if (routeScaleVal) routeScaleVal.textContent = '100%';
+        render();
+        showToast('路线位置已复位');
+      });
+    }
+
     inputDist.addEventListener('input', updatePaceFromInputs);
     inputTime.addEventListener('input', updatePaceFromInputs);
     inputPace.addEventListener('input', () => {
@@ -937,6 +1367,7 @@
   function init() {
     updateCanvasDimensions();
     initListeners();
+    loadRouteFromStorage();
     parseUrlParameters();
 
     // Clean initial state: do NOT load sample photo, wait for user photo

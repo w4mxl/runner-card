@@ -1,4 +1,4 @@
-const CACHE_NAME = 'runner-card-v8';
+const CACHE_NAME = 'runner-card-v9';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

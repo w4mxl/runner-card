@@ -121,6 +121,57 @@ main {
   display: flex;
   flex-direction: column;
   gap: 18px;
+/* Mode Segmented Control Bar */
+.mode-segmented-bar {
+  display: flex;
+  background: var(--bg-secondary);
+  border: 1px solid var(--card-border);
+  padding: 4px;
+  border-radius: 14px;
+  gap: 4px;
+  width: 100%;
+}
+
+.seg-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.seg-btn:active {
+  transform: scale(0.97);
+}
+
+.seg-btn.active {
+  background: var(--bg-tertiary);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.tag-status {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.tag-status.active {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
 }
 
 /* Canvas Preview Container */
