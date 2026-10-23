@@ -75,6 +75,8 @@
   const panelBottomData = document.getElementById('panelBottomData');
   const panelRouteData = document.getElementById('panelRouteData');
   const gpxFileInput = document.getElementById('gpxFileInput');
+  const gpxCard = document.getElementById('gpxCard');
+  const btnPasteGPX = document.getElementById('btnPasteGPX');
   const btnSelectGPX = document.getElementById('btnSelectGPX');
   const btnClearGPX = document.getElementById('btnClearGPX');
   const gpxStatusTag = document.getElementById('gpxStatusTag');
@@ -1015,6 +1017,15 @@
       state.routeDist = params.get('dist');
       inputRouteDist.value = state.routeDist;
     }
+    if (params.has('clip') || params.has('paste')) {
+      const btnPaste = document.getElementById('btnPasteGPX');
+      if (btnPaste) {
+        btnPaste.classList.add('highlight');
+      }
+      setTimeout(() => {
+        showToast('⚡️ 快捷指令已就绪：点击【一键粘贴最新轨迹】');
+      }, 400);
+    }
 
     if (changed) {
       showToast('⚡️ 已从 Apple 健身导入数据');
@@ -1022,29 +1033,30 @@
   }
 
   function updateGpxCardUI(isLoaded, fileName, gpsDist) {
-    if (!btnSelectGPX) return;
+    const card = document.getElementById('gpxCard') || btnSelectGPX;
+    if (!card) return;
     if (isLoaded) {
-      btnSelectGPX.classList.add('loaded');
+      card.classList.add('loaded');
       const distToShow = state.routeDist || state.dist || '5.13';
       const actualGps = gpsDist || state.routeGpsDist;
       if (gpxUploadTitle) gpxUploadTitle.textContent = `✅ 真实轨迹: ${distToShow} 公里`;
       const pointsCount = state.routePoints ? state.routePoints.length : 0;
-      let infoText = `${fileName || '已导入'} (${pointsCount} 点)`;
+      let infoText = `${fileName || '已载入'} (${pointsCount} 点)`;
       if (actualGps && String(actualGps) !== String(distToShow)) {
         infoText += ` · 轨迹实测 ${actualGps} km`;
       }
-      infoText += ' · 点击更换';
       if (gpxInfoBanner) gpxInfoBanner.textContent = infoText;
       if (gpxStatusTag) {
         gpxStatusTag.textContent = '已就绪';
         gpxStatusTag.classList.add('active');
       }
+      if (btnPasteGPX) btnPasteGPX.classList.remove('highlight');
     } else {
-      btnSelectGPX.classList.remove('loaded');
-      if (gpxUploadTitle) gpxUploadTitle.textContent = '选取跑步轨迹文件 (.gpx)';
-      if (gpxInfoBanner) gpxInfoBanner.textContent = '支持 Apple Watch / WorkoutGPX / 佳明 / Keep';
+      card.classList.remove('loaded');
+      if (gpxUploadTitle) gpxUploadTitle.textContent = '载入跑步真实轨迹 (.gpx)';
+      if (gpxInfoBanner) gpxInfoBanner.textContent = '支持 WorkoutGPX 快捷指令秒级粘贴 · 或选取文件';
       if (gpxStatusTag) {
-        gpxStatusTag.textContent = '点此选取';
+        gpxStatusTag.textContent = '待载入';
         gpxStatusTag.classList.remove('active');
       }
     }
@@ -1095,45 +1107,65 @@
     }
   }
 
+  // Common point processor for both File Upload and Clipboard Paste
+  function processGpxPoints(pts, sourceName) {
+    if (!pts || pts.length < 2) {
+      showToast('未在轨迹数据中识别出有效坐标点');
+      return false;
+    }
+    state.routePoints = pts;
+    const gpsDist = calculateRouteDistance(pts).toFixed(2);
+    state.routeGpsDist = gpsDist;
+
+    // Retain official workout record distance if available
+    const currentRouteInput = inputRouteDist ? inputRouteDist.value.trim() : '';
+    const currentBottomInput = inputDist ? inputDist.value.trim() : '';
+    const isDefaultOrEmpty = (v) => !v || v === '0' || v === '5.03' || v === '5.12';
+
+    let officialDist = '';
+    if (currentRouteInput && !isDefaultOrEmpty(currentRouteInput)) {
+      officialDist = currentRouteInput;
+    } else if (state.dist && !isDefaultOrEmpty(state.dist)) {
+      officialDist = state.dist;
+    } else if (currentBottomInput && !isDefaultOrEmpty(currentBottomInput)) {
+      officialDist = currentBottomInput;
+    }
+
+    if (officialDist) {
+      state.routeDist = officialDist;
+      if (inputRouteDist) inputRouteDist.value = officialDist;
+      showToast(`✅ 真实轨迹载入成功！(保留运动记录 ${officialDist} km)`);
+    } else {
+      state.routeDist = gpsDist;
+      if (inputRouteDist) inputRouteDist.value = gpsDist;
+      showToast(`✅ 真实轨迹载入成功！(${gpsDist} km)`);
+    }
+
+    saveRouteToStorage(sourceName || '最新轨迹', gpsDist);
+    render();
+    return true;
+  }
+
+  function handleGpxText(text, sourceName) {
+    if (!text || typeof text !== 'string') {
+      showToast('剪贴板中未检测到有效轨迹数据');
+      return false;
+    }
+    const trimmed = text.trim();
+    if (!trimmed.includes('<trkpt') && !trimmed.includes('<Trackpoint>') && !trimmed.includes('<wpt') && !trimmed.includes('<rtept')) {
+      showToast('剪贴板内容不是有效 GPX 轨迹格式');
+      return false;
+    }
+    const pts = parseGpxOrTcx(trimmed);
+    return processGpxPoints(pts, sourceName || '剪贴板轨迹');
+  }
+
   function handleGpxFile(file) {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = function(evt) {
       const pts = parseGpxOrTcx(evt.target.result);
-      if (pts && pts.length >= 2) {
-        state.routePoints = pts;
-        const gpsDist = calculateRouteDistance(pts).toFixed(2);
-        state.routeGpsDist = gpsDist;
-
-        // Issue 2: Retain official workout record distance if available
-        const currentRouteInput = inputRouteDist ? inputRouteDist.value.trim() : '';
-        const currentBottomInput = inputDist ? inputDist.value.trim() : '';
-        const isDefaultOrEmpty = (v) => !v || v === '0' || v === '5.03' || v === '5.12';
-
-        let officialDist = '';
-        if (currentRouteInput && !isDefaultOrEmpty(currentRouteInput)) {
-          officialDist = currentRouteInput;
-        } else if (state.dist && !isDefaultOrEmpty(state.dist)) {
-          officialDist = state.dist;
-        } else if (currentBottomInput && !isDefaultOrEmpty(currentBottomInput)) {
-          officialDist = currentBottomInput;
-        }
-
-        if (officialDist) {
-          state.routeDist = officialDist;
-          if (inputRouteDist) inputRouteDist.value = officialDist;
-          showToast(`真实轨迹导入成功（采用运动记录 ${officialDist} 公里）`);
-        } else {
-          state.routeDist = gpsDist;
-          if (inputRouteDist) inputRouteDist.value = gpsDist;
-          showToast(`真实轨迹导入成功 (${gpsDist} 公里)`);
-        }
-
-        saveRouteToStorage(file.name, gpsDist);
-        render();
-      } else {
-        showToast('未在文件中识别出有效轨迹坐标');
-      }
+      processGpxPoints(pts, file.name);
     };
     reader.readAsText(file);
   }
@@ -1221,15 +1253,68 @@
       });
     }
 
-    // GPX Selection & Parsing
+    // GPX Paste from Clipboard Button
+    if (btnPasteGPX) {
+      btnPasteGPX.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        try {
+          if (!navigator.clipboard || !navigator.clipboard.readText) {
+            showToast('当前环境不支持直接读取剪贴板，请长按屏幕粘贴');
+            return;
+          }
+          const text = await navigator.clipboard.readText();
+          if (!text) {
+            showToast('剪贴板为空，请先在快捷指令中运行');
+            return;
+          }
+          handleGpxText(text, 'WorkoutGPX 快捷指令');
+        } catch (err) {
+          console.warn('Clipboard read error:', err);
+          showToast('请允许 Safari 粘贴剪贴板权限');
+        }
+      });
+    }
+
+    // GPX Selection & Parsing from Files
     if (btnSelectGPX && gpxFileInput) {
-      btnSelectGPX.addEventListener('click', () => gpxFileInput.click());
+      btnSelectGPX.addEventListener('click', (e) => {
+        e.stopPropagation();
+        gpxFileInput.click();
+      });
+    }
+
+    if (gpxCard && gpxFileInput) {
+      gpxCard.addEventListener('click', () => {
+        if (!state.routePoints || state.routePoints.length < 2) {
+          if (btnPasteGPX) {
+            btnPasteGPX.click();
+          } else {
+            gpxFileInput.click();
+          }
+        } else {
+          gpxFileInput.click();
+        }
+      });
+    }
+
+    if (gpxFileInput) {
       gpxFileInput.addEventListener('change', (e) => {
         if (e.target.files && e.target.files[0]) {
           handleGpxFile(e.target.files[0]);
         }
       });
     }
+
+    // Global Paste Listener (supports native paste / Cmd+V / 3-finger pinch-out)
+    window.addEventListener('paste', (e) => {
+      let text = '';
+      if (e.clipboardData) {
+        text = e.clipboardData.getData('text/plain') || e.clipboardData.getData('text');
+      }
+      if (text && (text.includes('<trkpt') || text.includes('<Trackpoint>') || text.includes('<gpx'))) {
+        handleGpxText(text, '系统剪贴板粘贴');
+      }
+    });
 
     if (btnClearGPX) {
       btnClearGPX.addEventListener('click', (e) => {
@@ -1238,6 +1323,7 @@
         state.routeGpsDist = null;
         updateGpxCardUI(false);
         if (gpxFileInput) gpxFileInput.value = '';
+        if (btnPasteGPX) btnPasteGPX.classList.remove('highlight');
         localStorage.removeItem('runner_card_real_route');
         showToast('已清除当前轨迹');
         render();
@@ -1487,16 +1573,29 @@
     });
 
     document.getElementById('btnCopyShortcutUrl').addEventListener('click', () => {
-      const text = `Apple Watch 晨跑打卡快捷指令设置步骤：
-1. 打开 iPhone“快捷指令”App，新建快捷指令
-2. 添加动作【查找 体能训练】：
-   - 类型 是 跑步
-   - 开始日期 是 今天
-   - 排序方式：开始日期（从新到旧），限制 1 项
-3. 添加动作【计算】，根据“持续时间(秒) / 总距离(公里)”换算出配速
-4. 添加动作【打开 URL】，填入 RunnerCard 地址并拼接参数：
-   ?dist=总距离&time=持续时间&pace=配速
-5. 跑完步在桌面点一下，即可自动填好运动数据并选图打卡！`;
+      const text = `🏃 Apple Watch + WorkoutGPX 晨跑打卡极速快捷指令搭建：
+
+【前提准备】
+iPhone 安装最新版 WorkoutGPX App 并授予“健康”读取权限。
+
+【快捷指令动作配置（共 6 步）】
+1. 打开“快捷指令”App，新建快捷指令（命名为“晨跑打卡”）。
+2. 添加动作【WorkoutGPX - Export Latest Workout】
+   - 活动类型设为：Running (跑步)
+3. 添加动作【文稿 - 从输入中获取文本】
+   - 输入选择上一步的“导出的体能训练”
+4. 添加动作【共享 - 拷贝至剪贴板】
+   - 将上一步的 GPX 纯文本暂存到剪贴板
+5. 添加动作【健康 - 查找 体能训练】
+   - 类型 是 跑步，开始日期 是 今天
+   - 排序：开始日期（从新到旧），限制 1 项
+   - 添加动作【计算】：持续时间(秒) ÷ 总距离(公里)，换算出配速
+6. 添加动作【Safari 浏览器 - 打开 URL】：
+   https://w4mxl.github.io/runner-card/?dist=[总距离]&time=[持续时间]&pace=[配速]&hr=[平均心率]&cal=[总活动能量]&mode=route&clip=1
+
+【使用效果】
+跑完步在桌面点一下该快捷指令：
+0.5 秒后台导出 GPX -> 自动调起打卡器 -> 点击【一键粘贴最新轨迹】-> 真实路线秒级呈现！无需在文件 App 翻找！`;
 
       navigator.clipboard.writeText(text).then(() => {
         showToast('已复制快捷指令配置说明到剪贴板！');

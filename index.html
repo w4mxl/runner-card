@@ -129,17 +129,34 @@
       <input type="file" id="gpxFileInput" style="display: none;">
 
       <!-- Hero Upload Zone / Status Box -->
-      <div class="gpx-upload-card" id="btnSelectGPX">
+      <div class="gpx-upload-card" id="gpxCard">
         <div class="gpx-upload-icon" id="gpxUploadIcon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
           </svg>
         </div>
         <div class="gpx-upload-text">
-          <div class="gpx-upload-title" id="gpxUploadTitle">选取跑步轨迹文件 (.gpx)</div>
-          <div class="gpx-upload-desc" id="gpxInfoBanner">支持 Apple Watch / WorkoutGPX / 佳明 / Keep</div>
+          <div class="gpx-upload-title" id="gpxUploadTitle">载入跑步真实轨迹 (.gpx)</div>
+          <div class="gpx-upload-desc" id="gpxInfoBanner">支持 WorkoutGPX 快捷指令秒级粘贴 · 或选取文件</div>
         </div>
-        <div class="gpx-upload-badge" id="gpxStatusTag">点此选取</div>
+        <div class="gpx-upload-badge" id="gpxStatusTag">待载入</div>
+      </div>
+
+      <!-- Quick Action Buttons: Paste from Clipboard vs Select from Files -->
+      <div class="gpx-action-row">
+        <button type="button" class="btn-gpx-action btn-paste-gpx" id="btnPasteGPX" title="通过快捷指令一键粘贴最新轨迹">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+            <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+          </svg>
+          一键粘贴最新轨迹
+        </button>
+        <button type="button" class="btn-gpx-action btn-file-gpx" id="btnSelectGPX" title="从文件 App 或 WorkoutGPX 目录选取">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          选取文件
+        </button>
       </div>
 
       <div class="inputs-grid" style="grid-template-columns: 1fr 1fr; margin-top: 4px;">
@@ -282,7 +299,7 @@
   <div class="modal-backdrop" id="helpModal">
     <div class="modal-card">
       <div class="modal-header">
-        <h2>⚡️ 联动 Apple Watch 极速打卡</h2>
+        <h2>⚡️ 联动 WorkoutGPX 极速打卡</h2>
         <button class="btn-icon" id="btnCloseHelp" style="width: 32px; height: 32px;">✕</button>
       </div>
       
@@ -290,23 +307,23 @@
         <div class="step-num">1</div>
         <div class="step-content">
           <h4>日常佩戴 Apple Watch 跑步</h4>
-          <p>像往常一样使用自带“健身”App 记录户外跑步。跑完在 Watch 或 iPhone 上完成体能训练并拍一张晨拍照片。</p>
+          <p>使用 Apple Watch 自带“体能训练”记录户外跑步。跑完停止体能训练，并随手拍一张跑步照片。</p>
         </div>
       </div>
 
       <div class="shortcut-step">
         <div class="step-num">2</div>
         <div class="step-content">
-          <h4>配置 iOS 快捷指令（一键直达）</h4>
-          <p>只需在 iPhone“快捷指令”中创建 1 个动作：自动读取 Apple 健康今天最新的跑步记录，一键带入参数打开打卡器！</p>
+          <h4>WorkoutGPX 快捷指令（秒级提取轨迹）</h4>
+          <p>在 iOS 快捷指令中添加【WorkoutGPX - Export Latest Workout】并拷贝文本到剪贴板，一键调起本工具，无需翻找任何文件夹！</p>
         </div>
       </div>
 
       <div class="shortcut-step">
         <div class="step-num">3</div>
         <div class="step-content">
-          <h4>添加到主屏幕（PWA 离线体验）</h4>
-          <p>在 Safari 底部点击“分享”按钮 -> 选择“添加到主屏幕”，即可拥有如同原生 App 的极速离线体验。</p>
+          <h4>一键粘贴 · 1 秒成图</h4>
+          <p>打开页面后点击【一键粘贴最新轨迹】，真实 GPS 路线瞬间载入，支持 4 象限排版与官方 1:1 NRC 卡片导出！</p>
         </div>
       </div>
 

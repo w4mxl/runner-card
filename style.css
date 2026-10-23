@@ -254,6 +254,67 @@ main {
   color: #10b981;
 }
 
+/* Dual Quick Actions: Paste from Clipboard & Select File */
+.gpx-action-row {
+  display: grid;
+  grid-template-columns: 1.25fr 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.btn-gpx-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid transparent;
+  outline: none;
+}
+
+.btn-paste-gpx {
+  background: rgba(255, 94, 30, 0.15);
+  color: #ff8a50;
+  border-color: rgba(255, 94, 30, 0.35);
+}
+
+.btn-paste-gpx:active {
+  background: rgba(255, 94, 30, 0.28);
+  transform: scale(0.98);
+}
+
+.btn-paste-gpx.highlight {
+  background: rgba(255, 94, 30, 0.25);
+  border-color: #ff5e1e;
+  color: #fff;
+  animation: pulseGlow 1.8s infinite;
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(255, 94, 30, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(255, 94, 30, 0);
+  }
+}
+
+.btn-file-gpx {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.btn-file-gpx:active {
+  background: rgba(255, 255, 255, 0.1);
+  transform: scale(0.98);
+}
+
 /* Position Quick Presets */
 .route-pos-section {
   border-top: 1px solid var(--card-border);
