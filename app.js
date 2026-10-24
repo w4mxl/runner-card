@@ -1146,17 +1146,59 @@
     return true;
   }
 
+  function decodeBase64ToUtf8(b64Str) {
+    try {
+      const cleanB64 = b64Str.replace(/\s+/g, '');
+      const binStr = atob(cleanB64);
+      const bytes = Uint8Array.from(binStr, c => c.charCodeAt(0));
+      return new TextDecoder('utf-8').decode(bytes);
+    } catch (e) {
+      try {
+        return atob(b64Str.replace(/\s+/g, ''));
+      } catch (err) {
+        return '';
+      }
+    }
+  }
+
   function handleGpxText(text, sourceName) {
     if (!text || typeof text !== 'string') {
       showToast('剪贴板中未检测到有效轨迹数据');
       return false;
     }
-    const trimmed = text.trim();
-    if (!trimmed.includes('<trkpt') && !trimmed.includes('<Trackpoint>') && !trimmed.includes('<wpt') && !trimmed.includes('<rtept')) {
-      showToast('剪贴板内容不是有效 GPX 轨迹格式');
+    let content = text.trim();
+
+    // 1. If it's Base64 encoded (e.g. from Shortcuts "Base64 编码" action)
+    if (!content.includes('<trkpt') && !content.includes('<Trackpoint>') && !content.includes('<wpt') && !content.includes('<gpx')) {
+      const decoded = decodeBase64ToUtf8(content);
+      if (decoded && (decoded.includes('<trkpt') || decoded.includes('<Trackpoint>') || decoded.includes('<wpt') || decoded.includes('<gpx'))) {
+        content = decoded;
+      }
+    }
+
+    // 2. If it's URL-encoded
+    if (content.startsWith('%3C') || content.includes('%3Ctrkpt')) {
+      try {
+        const decoded = decodeURIComponent(content);
+        if (decoded.includes('<trkpt') || decoded.includes('<Trackpoint>') || decoded.includes('<wpt') || decoded.includes('<gpx')) {
+          content = decoded;
+        }
+      } catch (e) {}
+    }
+
+    // 3. Check for valid GPX/TCX tags
+    if (!content.includes('<trkpt') && !content.includes('<Trackpoint>') && !content.includes('<wpt') && !content.includes('<rtept')) {
+      // Check if it's just a file name (e.g. Shortcuts passed file object to "Get Text from Input")
+      if (content.endsWith('.gpx') || content.endsWith('.xml') || content.includes('.gpx') || content.includes('Running_')) {
+        showToast('检测到仅复制了文件名。请在快捷指令中添加【Base64 编码】动作');
+      } else {
+        const preview = content.length > 25 ? (content.slice(0, 25) + '...') : content;
+        showToast('剪贴板内容不是有效 GPX: ' + preview);
+      }
       return false;
     }
-    const pts = parseGpxOrTcx(trimmed);
+
+    const pts = parseGpxOrTcx(content);
     return processGpxPoints(pts, sourceName || '剪贴板轨迹');
   }
 
@@ -1579,13 +1621,13 @@
 iPhone 安装最新版 WorkoutGPX App 并授予“健康”读取权限。
 
 【快捷指令动作配置（共 6 步）】
-1. 打开“快捷指令”App，新建快捷指令（命名为“晨跑打卡”）。
+1. 打开“快捷指令”App，编辑现有的“晨跑打卡”。
 2. 添加动作【WorkoutGPX - Export Latest Workout】
    - 活动类型设为：Running (跑步)
-3. 添加动作【文稿 - 从输入中获取文本】
+3. 添加动作【脚本 - Base64 编码】（核心一步：将 GPX 完整数据转为字符串）
    - 输入选择上一步的“导出的体能训练”
 4. 添加动作【共享 - 拷贝至剪贴板】
-   - 将上一步的 GPX 纯文本暂存到剪贴板
+   - 输入选择上一步的“Base64 编码的文本”
 5. 添加动作【健康 - 查找 体能训练】
    - 类型 是 跑步，开始日期 是 今天
    - 排序：开始日期（从新到旧），限制 1 项
@@ -1595,7 +1637,7 @@ iPhone 安装最新版 WorkoutGPX App 并授予“健康”读取权限。
 
 【使用效果】
 跑完步在桌面点一下该快捷指令：
-0.5 秒后台导出 GPX -> 自动调起打卡器 -> 点击【一键粘贴最新轨迹】-> 真实路线秒级呈现！无需在文件 App 翻找！`;
+后台自动导出 GPX -> 调起打卡器 -> 点击【一键粘贴最新轨迹】-> 真实路线秒级呈现！无需在文件 App 翻找！`;
 
       navigator.clipboard.writeText(text).then(() => {
         showToast('已复制快捷指令配置说明到剪贴板！');
